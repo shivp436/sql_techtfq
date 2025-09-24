@@ -1,0 +1,80 @@
+DROP TABLE IF EXISTS REL;
+CREATE TABLE REL 
+(
+  PID NVARCHAR(2),
+  R1 NVARCHAR(5),
+  R2 NVARCHAR(5)
+);
+
+INSERT INTO REL
+VALUES 
+('A1', NULL, NULL),
+('A2', 'A1', NULL),
+('A3', 'A2', NULL),
+('A4', 'A3', NULL),
+('A5', 'A4', NULL),
+('B1', NULL, NULL),
+('B2', NULL, 'B1'),
+('B3', NULL, 'B2'),
+('B4', NULL, 'B3'),
+('B5', NULL, 'B4'),
+('C1', NULL, 'C3'),
+('C2', 'C1', NULL),
+('C3', NULL, NULL),
+('D1', 'D3', 'E2'),
+('D2', NULL, NULL),
+('D3', NULL, NULL),
+('E1', NULL, 'D2'),
+('E2', NULL, NULL),
+('F1', NULL, NULL),
+('F2', NULL, NULL),
+('F3', NULL, NULL),
+('G1', 'G1', NULL),
+('G2', 'G1', NULL),
+('G3', 'G1', NULL),
+('H1', 'G1', NULL),
+('H2', 'G1', NULL),
+('H3', 'G1', NULL),
+('I1', NULL, NULL),
+('I2', 'I3', 'I1');
+
+SELECT '--------------' AS [INPUT DATA: ];
+SELECT * FROM REL;
+SELECT '';
+SELECT '--------------' AS [OUTPUT RESULT: ];
+
+
+WITH CTE AS (
+  -- Anchor: start from given PID (e.g., 'A1')
+  SELECT PID AS FID, PID, R1, R2, CAST(PID AS NVARCHAR(MAX)) AS Path
+  FROM REL
+  --WHERE PID = 'A1'
+  
+  UNION ALL
+
+  -- Recursive part: join in all directions
+  SELECT A.FID, R.PID, R.R1, R.R2, A.Path + '->' + R.PID
+  FROM CTE AS A
+  JOIN REL AS R 
+      ON R.PID = A.R1 OR R.PID = A.R2       -- upward: CURR IS A RELATIVE OF PREV
+      OR A.PID = R.R1 OR A.PID = R.R2       -- downward: PREV IS A RELATIVE OF CURR
+  WHERE CHARINDEX(R.PID, A.Path) = 0        -- prevent cycles
+)
+
+, RELS AS (
+  SELECT DISTINCT FID, PID FROM CTE WHERE PID IS NOT NULL
+  UNION 
+  SELECT DISTINCT FID, R1 FROM CTE WHERE R1 IS NOT NULL 
+  UNION 
+  SELECT DISTINCT FID, R2 FROM CTE WHERE R2 IS NOT NULL
+)
+
+, FAMS AS (SELECT DISTINCT
+  STRING_AGG(PID, ', ') AS MEMBERS
+FROM RELS
+GROUP BY FID)
+
+SELECT 
+  CONCAT('FAM - ', ROW_NUMBER() OVER(ORDER BY (SELECT NULL))) AS FAMILY
+  , MEMBERS
+FROM FAMS;
